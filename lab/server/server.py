@@ -9,13 +9,17 @@ import time
 
 app = Flask(__name__)
 
-engine = create_engine('sqlite:///rssi.db')
+engine = create_engine('sqlite:///rssi.db', echo=True)
 base = declarative_base()
+base.metadata.create_all(engine)
+
+# app.config['SECRET_KEY'] = 'Thisissupposedtobesecret!'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///rssi.db'
+# db = SQLAlchemy(app)
+
+
 Session = sessionmaker(bind=engine)
-<<<<<<< HEAD
 session = Session()
-=======
->>>>>>> bf65e8d1131c708ae39be746e6029e973be68707
 
 class AccessPoint(base):
     __tablename__ = "accesspoint"
@@ -60,9 +64,8 @@ class CalibratingMobile(base):
 
 @app.route("/rssi", methods=['GET', 'POST'])
 def rssi():
-<<<<<<< HEAD
     """
-	TODO: Implement this function
+	ToDO: Implement this function
 	It receives data from the access points on the path /rssi
 	with a parameter ap whose value is the sending AP MAC address
 	and a series of pairs XX:XX:XX:XX:XX:XX=-YY.YYYY
@@ -83,7 +86,7 @@ def rssi():
         print(source_adress + "\n")
         print(rssi + "\n")
 
-        ap_id = AccessPoint(mac_address=data.ap)
+        ap_id = AccessPoint(mac_address=ap)
         rssi_avrg = Sample(ap_id=ap_id,source_address=source_adress , timestamp=time.time(),rssi=rssi )
 
         session.add(ap_id)
@@ -93,27 +96,11 @@ def rssi():
         session.close()
         return "POST ok"
     else:
-        for instance in session.query(Sample).order_by(Sample.id):
+        print("coucou")
+        for instance in session.query(Sample).order_by(Sample.rssi):
             print(instance.ap_id, instance.rssi)
         return "GET ok"
 
-=======
-	"""
-		TODO: Implement this function
-		It receives data from the access points on the path /rssi
-		with a parameter ap whose value is the sending AP MAC address
-		and a series of pairs XX:XX:XX:XX:XX:XX=-YY.YYYY
-		where the X's are the measured devices MAC addresses
-			  and the Y's are the avg RSSI values for the corresponding
-			  MAC address over the last second
-		You have to put these information in the sqlite3 database
-		named rssi.db whose schema can be displayed from the sqlite3
-		prompt through the command .schema
-		SQL Alchemy ORM classes and initialization are available above
-    """
-    
-    # return "ok"
->>>>>>> bf65e8d1131c708ae39be746e6029e973be68707
 
 
 @app.route("/start_calibration", methods=['GET', 'POST'])
@@ -131,16 +118,12 @@ def start_calibration():
         (3) In /rssi route: add instructions that process all incoming RSSI samples like
             step (2) when received.
     """
-<<<<<<< HEAD
     if request.method == 'POST':
         data = request.data
 
     else:
 
-=======
-    # Your code here
->>>>>>> bf65e8d1131c708ae39be746e6029e973be68707
-    return "ok"
+        return "ok"
 
 
 @app.route("/stop_calibration", methods=['GET', 'POST'])
