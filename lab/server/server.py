@@ -21,8 +21,7 @@ base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session_ = Session()
 
-# startCalibration=False
-# session["startCalibration"]=startCalibration
+space = "    |    "
 
 class AccessPoint(base):
     __tablename__ = "accesspoint"
@@ -133,12 +132,14 @@ def rssi():
         return "\n\rPOST ok\n"
     else:
         print("\n Sample table \n")
+        print("Source address" +space+"AP id" +space+"Timestamp"+space+"RSSI\n")
         for instance in session_.query(Sample).order_by(Sample.rssi):
-            print(instance.source_address, instance.ap_id, instance.timestamp, instance.rssi)
+            print(instance.source_address,space, instance.ap_id,space, instance.timestamp,space, instance.rssi)
 
         print("\n AccessPoint table \n")
+        print("AP id" +space+"Mac address\n")
         for instance in session_.query(AccessPoint).order_by(AccessPoint.id):
-            print(instance.id, instance.mac_address)
+            print(instance.id,space, instance.mac_address)
         return "\n\rGET ok\n"
 
 
@@ -213,16 +214,19 @@ def start_calibration():
 
     else:
         print("\n Location table \n")
+        print("Id" +space+"X value" +space+"Y value"+space+"Z value\n")
         for instance in session_.query(Location).order_by(Location.id):
-            print(instance.id, instance.x, instance.y, instance.z)
+            print(instance.id,space, instance.x,space, instance.y,space, instance.z)
 
         print("\n Calibrating mobile table \n")
+        print("Mac address" +space+"location ID\n")
         for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
-            print(instance.mac_address, instance.loc_id)
+            print(instance.mac_address,space, instance.loc_id)
         
         print("\n Fingerprint value table \n")
+        print("Id" +space+"location ID" +space+"AP ID"+space+"rssi value\n")
         for instance in session_.query(FingerprintValue).order_by(FingerprintValue.id):
-            print(instance.id, instance.loc_id, instance.ap_id, instance.rssi)
+            print(instance.id,space, instance.loc_id,space, instance.ap_id,space, instance.rssi)
 
         return "\n\rGET ok\n"
 
@@ -234,8 +238,50 @@ def stop_calibration():
         It receives one parameter: mac_addr (string)
         It must delete any calibrating_mobile entry whose mac_address equal parameter mac_addr
     """
-    # Your code here
-    return "ok"
+
+    if request.method == 'POST':
+
+        #Fetch data
+        mac_addr = request.args.get('mac_addr')
+
+        #Check if data are given
+        if not mac_addr:
+            return "No mac address provided"
+        
+        #Convert data into the right type
+        mac_addr = str(mac_addr)
+
+        startCalibration=False
+        session["startCalibration"]=startCalibration
+        
+        #Delete any calibrating_mobile entry whose mac_address equal parameter mac_addr
+        for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
+            if instance.mac_address == mac_addr:
+                session_.delete(instance)
+        
+        #Commit and close
+        session_.commit()
+        session_.close()
+        
+        return "\n\rPOST ok\n"
+
+    else:
+        print("\n Location table \n")
+        print("Id" +space+"X value" +space+"Y value"+space+"Z value\n")
+        for instance in session_.query(Location).order_by(Location.id):
+            print(instance.id,space, instance.x,space, instance.y,space, instance.z)
+
+        print("\n Calibrating mobile table \n")
+        print("Mac address" +space+"location ID\n")
+        for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
+            print(instance.mac_address,space, instance.loc_id)
+        
+        print("\n Fingerprint value table \n")
+        print("Id" +space+"location ID" +space+"AP ID"+space+"rssi value\n")
+        for instance in session_.query(FingerprintValue).order_by(FingerprintValue.id):
+            print(instance.id,space, instance.loc_id,space, instance.ap_id,space, instance.rssi)
+
+        return "\n\rGET ok\n"
 
 
 @app.route("/locate", methods=['GET', 'POST'])
