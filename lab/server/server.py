@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-import time
+import time, json
 
 from sqlalchemy.sql.expression import false
 
@@ -131,16 +131,34 @@ def rssi():
         session_.close()
         return "\n\rPOST ok\n"
     else:
+        #If request.method is equal to 'GET', fetch and return samples and access points in the database
+        json_response = {"samples":[],"access points":[]}
         print("\n Sample table \n")
         print("Source address" +space+"AP id" +space+"Timestamp"+space+"RSSI\n")
         for instance in session_.query(Sample).order_by(Sample.rssi):
+            sample = {
+                        "source adress":instance.source_address,
+                        "access point id":instance.ap_id,
+                        "timestamp":instance.timestamp,
+                        "rssi":instance.rssi
+                        }
+            json_response["samples"].append(sample)
             print(instance.source_address,space, instance.ap_id,space, instance.timestamp,space, instance.rssi)
 
         print("\n AccessPoint table \n")
         print("AP id" +space+"Mac address\n")
         for instance in session_.query(AccessPoint).order_by(AccessPoint.id):
+            access_point = {
+                        "id":instance.id,
+                        "mac address":instance.mac_address,
+                        }
+            json_response["access points"].append(access_point)
             print(instance.id,space, instance.mac_address)
-        return "\n\rGET ok\n"
+        
+        
+        json_response = json.dumps(json_response, indent=4)
+        
+        return json_response
 
 
 
@@ -213,22 +231,45 @@ def start_calibration():
         return "\n\rPOST ok\n"
 
     else:
+        #If request.method is equal to 'GET', fetch and return locations, calibrating mobiles and fingerprints in the database
+        json_response = {"locations":[],"calibrating mobiles":[],"fingerprints":[]}
         print("\n Location table \n")
         print("Id" +space+"X value" +space+"Y value"+space+"Z value\n")
         for instance in session_.query(Location).order_by(Location.id):
+            location = {
+                        "id":instance.id,
+                        "x":instance.x,
+                        "y":instance.y,
+                        "z":instance.z
+                        }
+            json_response["locations"].append(location)
             print(instance.id,space, instance.x,space, instance.y,space, instance.z)
 
         print("\n Calibrating mobile table \n")
         print("Mac address" +space+"location ID\n")
         for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
+            calibrating = {
+                            "mac_address":instance.mac_address,
+                            "location id":instance.loc_id
+                            }
+            json_response["calibrating mobiles"].append(calibrating)
             print(instance.mac_address,space, instance.loc_id)
         
         print("\n Fingerprint value table \n")
         print("Id" +space+"location ID" +space+"AP ID"+space+"rssi value\n")
         for instance in session_.query(FingerprintValue).order_by(FingerprintValue.id):
+            fingerprint = {
+                        "id":instance.id,
+                        "location id":instance.loc_id,
+                        "access point id":instance.ap_id,
+                        "rssi":instance.rssi
+                        }
+            json_response["fingerprints"].append(fingerprint)
             print(instance.id,space, instance.loc_id,space, instance.ap_id,space, instance.rssi)
-
-        return "\n\rGET ok\n"
+        
+        json_response = json.dumps(json_response, indent=4)
+        
+        return json_response
 
 
 @app.route("/stop_calibration", methods=['GET', 'POST'])
@@ -253,7 +294,7 @@ def stop_calibration():
 
         startCalibration=False
         session["startCalibration"]=startCalibration
-        
+
         #Delete any calibrating_mobile entry whose mac_address equal parameter mac_addr
         for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
             if instance.mac_address == mac_addr:
@@ -266,22 +307,45 @@ def stop_calibration():
         return "\n\rPOST ok\n"
 
     else:
+        #If request.method is equal to 'GET', fetch and return locations, calibrating mobiles and fingerprints in the database
+        json_response = {"locations":[],"calibrating mobiles":[],"fingerprints":[]}
         print("\n Location table \n")
         print("Id" +space+"X value" +space+"Y value"+space+"Z value\n")
         for instance in session_.query(Location).order_by(Location.id):
+            location = {
+                        "id":instance.id,
+                        "x":instance.x,
+                        "y":instance.y,
+                        "z":instance.z
+                        }
+            json_response["locations"].append(location)
             print(instance.id,space, instance.x,space, instance.y,space, instance.z)
 
         print("\n Calibrating mobile table \n")
         print("Mac address" +space+"location ID\n")
         for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
+            calibrating = {
+                            "mac_address":instance.mac_address,
+                            "location id":instance.loc_id
+                            }
+            json_response["calibrating mobiles"].append(calibrating)
             print(instance.mac_address,space, instance.loc_id)
         
         print("\n Fingerprint value table \n")
         print("Id" +space+"location ID" +space+"AP ID"+space+"rssi value\n")
         for instance in session_.query(FingerprintValue).order_by(FingerprintValue.id):
+            fingerprint = {
+                        "id":instance.id,
+                        "location id":instance.loc_id,
+                        "access point id":instance.ap_id,
+                        "rssi":instance.rssi
+                        }
+            json_response["fingerprints"].append(fingerprint)
             print(instance.id,space, instance.loc_id,space, instance.ap_id,space, instance.rssi)
-
-        return "\n\rGET ok\n"
+        
+        json_response = json.dumps(json_response, indent=4)
+        
+        return json_response
 
 
 @app.route("/locate", methods=['GET', 'POST'])
