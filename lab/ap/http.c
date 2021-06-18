@@ -27,4 +27,17 @@ void send_samples(RSSILog samples, string ap_mac_addr) {
    * HTTP requests handling use Poco::Net API
    * */
   // TODO: your code here
+    Configuration* conf = Configuration::getInstance();
+    string serv_host = conf->getServerHost();
+    unsigned short serv_port = conf->getServerPort();
+    
+    string URL = "http://"+serv_host+":"+to_string(serv_port)+"/rssi?ap=" + ap_mac_addr; 
+    
+    for (auto &sample : samples){   
+      URL += "&" + sample.mac_address + "=" + to_string(sample.rssi);
+    }
+    
+    HTTPClientSession HTTP_session(serv_host,serv_port);
+    HTTPRequest HTTP_request(HTTPRequest::HTTP_POST,URL,HTTPMessage::HTTP_1_1);
+    HTTP_session.sendRequest(HTTP_request);
 }
