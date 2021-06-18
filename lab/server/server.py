@@ -1,11 +1,9 @@
 from flask import Flask
 from flask import request, session
+import json, datetime
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
-
-import time, json
+from server.model import AccessPoint, Location, Sample, FingerprintValue, CalibratingMobile
+from server.databaseMethods import Database
 
 from sqlalchemy.sql.expression import false
 
@@ -14,55 +12,11 @@ SECRET_KEY = '\xfd{H\xe5<\x95\xf9\xe3\x96.5\xd1\x01O<!\xd5\xa2\xa0\x9fR"\xa1\xa8
 app = Flask(__name__)
 app.config['SECRET_KEY']= SECRET_KEY
 
-engine = create_engine('sqlite:///server/rssi.db', echo=True)
-base = declarative_base()
-base.metadata.create_all(engine)
-
-Session = sessionmaker(bind=engine)
-session_ = Session()
+database=Database()
 
 space = "    |    "
 
-class AccessPoint(base):
-    __tablename__ = "accesspoint"
-    id = Column(Integer, primary_key=True)
-    mac_address = Column(String)
 
-class Location(base):
-    __tablename__ = "location"
-    id = Column(Integer, primary_key=True)
-    x = Column(Float)
-    y = Column(Float)
-    z = Column(Float)
-
-class Sample(base):
-    __tablename__ = "sample"
-    ap_id = Column(Integer, ForeignKey("accesspoint.id"))
-    source_address = Column(String, nullable=False, primary_key=True)
-    timestamp = Column(Float, nullable=False, primary_key=True)
-    rssi = Column(Float, nullable=False)
-    ap = relationship("AccessPoint", backref="sample")
-
-    def values(self, src, t, _rssi, _ap):
-        source_address = src
-        timestamp = t
-        rssi = _rssi
-        ap = _ap
-
-class FingerprintValue(base):
-    __tablename__ = "fingerprint_value"
-    id = Column(Integer, primary_key=True)
-    loc_id = Column(Integer, ForeignKey("location.id"))
-    ap_id = Column(Integer, ForeignKey("accesspoint.id"))
-    rssi = Column(Float, nullable=False)
-    location = relationship("Location", backref="fingerprint_value")
-    ap = relationship("AccessPoint", backref="fingerprint_value")
-
-class CalibratingMobile(base):
-    __tablename__ = "calibrating_mobile"
-    mac_address = Column(String, primary_key=True)
-    loc_id = Column(Integer, ForeignKey("location.id"))
-    location = relationship("Location", backref="calibrating_mobile")
 
 @app.route("/rssi", methods=['GET', 'POST'])
 def rssi():
@@ -71,7 +25,7 @@ def rssi():
 	It receives data from the access points on the path /rssi
 	with a parameter ap whose value is the sending AP MAC address
 	and a series of pairs XX:XX:XX:XX:XX:XX=-YY.YYYY
-	where the X's are the measured devices MAC addresses
+	where the X's ModuleNotFoundError: No module named 'server.models'; 'server' is not a packageare the measured devices MAC addresses
 		  and the Y's are the avg RSSI values for the corresponding
 		  MAC address over the last second
 	You have to put these information in the sqlite3 database
@@ -81,33 +35,34 @@ def rssi():
 	"""
 
     if request.method == 'POST':
-        ap = request.args.get('ap')
-        source_address = request.args.get('source_address')
-        rssi = request.args.get('rssi')
-
+        parameters = request.args.to_dict()
         #Check parameters
-        if not ap:
-            return "No Access point parameters"
-        if not source_address:
-            return "No source adress parameters"
-        if not rssi:
-            return "No rssi parameters"
-        
-        #Convert data into the right type
-        ap = str(ap)
-        source_address = str(source_address)
-        rssi = float(rssi)
+        if not parameters['ap']:
+                return "No Access point parameters"
+        for param in parameters:
+            if param != 'ap':
+                #Check the source_adress
+                if not param:
+                    return "No source adress parameters"
+                #Check rssi values
+                if not parameters[param]:
+                    return "No rssi parameters"
 
         #Create an access point
-        ap_id = AccessPoint(mac_address=ap)
-        session_.add(ap_id)
-        session_.flush()
+        ap = AccessPoint(mac_address=parameters['ap'])
 
-        #Create a Sample
-        rssi_avrg = Sample(ap_id=ap_id.id,source_address=source_address , timestamp=time.time(),rssi=rssi)
+        #Create a Sample for each pairs of mac_address and rssi
+        for key in parameters:
+            #Look at the pairs (not the access point value)
+            if key != 'ap':
+            #If the ap does not exist in the database, create it
+                if not database.get_ap(ap.mac_address):
+                    database.add_to_database(ap)
+                
+                #Create and add the sample to the database using pairs
+                sample = Sample(ap_id=database.get_ap_id(ap),source_address=key, timestamp=123,rssi=float(parameters[key]),ap=database.get_ap(ap.mac_address))
+                database.add_to_database(sample)
 
-        
-        session_.add(rssi_avrg)
 
         startCalibration = session.get("startCalibration",None)
 
@@ -127,15 +82,13 @@ def rssi():
                 session_.add(fingerprint)
 
         #Commit and close   
-        session_.commit()
-        session_.close()
         return "\n\rPOST ok\n"
     else:
         #If request.method is equal to 'GET', fetch and return samples and access points in the database
         json_response = {"samples":[],"access points":[]}
-        print("\n Sample table \n")
-        print("Source address" +space+"AP id" +space+"Timestamp"+space+"RSSI\n")
-        for instance in session_.query(Sample).order_by(Sample.rssi):
+
+        #Return all samples
+        for instance in database.get_sample_all():
             sample = {
                         "source adress":instance.source_address,
                         "access point id":instance.ap_id,
@@ -143,17 +96,14 @@ def rssi():
                         "rssi":instance.rssi
                         }
             json_response["samples"].append(sample)
-            print(instance.source_address,space, instance.ap_id,space, instance.timestamp,space, instance.rssi)
-
-        print("\n AccessPoint table \n")
-        print("AP id" +space+"Mac address\n")
-        for instance in session_.query(AccessPoint).order_by(AccessPoint.id):
+        
+        #Return all access_points
+        for instance in database.get_ap_all():
             access_point = {
                         "id":instance.id,
                         "mac address":instance.mac_address,
                         }
             json_response["access points"].append(access_point)
-            print(instance.id,space, instance.mac_address)
         
         
         json_response = json.dumps(json_response, indent=4)
@@ -202,8 +152,6 @@ def start_calibration():
 
         #Fill callibrating_mobile table
         location = Location(x=x, y=y, z=z)
-        session_.add(location)
-        session_.flush()
 
         cal_mobile = CalibratingMobile(mac_address=mac_addr, loc_id=location.id)
         session_.add(cal_mobile)
@@ -223,19 +171,16 @@ def start_calibration():
         if len(sampleList)>0:
             for sample in sampleList:
                 fingerprint = FingerprintValue(loc_id = location.id, ap_id = sample.ap_id, rssi=sample.rssi)
-                session_.add(fingerprint)
+                database.add_to_database(fingerprint)
 
-        #Commit and close
-        session_.commit()
-        session_.close()
         return "\n\rPOST ok\n"
 
     else:
         #If request.method is equal to 'GET', fetch and return locations, calibrating mobiles and fingerprints in the database
         json_response = {"locations":[],"calibrating mobiles":[],"fingerprints":[]}
-        print("\n Location table \n")
-        print("Id" +space+"X value" +space+"Y value"+space+"Z value\n")
-        for instance in session_.query(Location).order_by(Location.id):
+
+        #Return all locations
+        for instance in database.get_location_all():
             location = {
                         "id":instance.id,
                         "x":instance.x,
@@ -243,21 +188,17 @@ def start_calibration():
                         "z":instance.z
                         }
             json_response["locations"].append(location)
-            print(instance.id,space, instance.x,space, instance.y,space, instance.z)
 
-        print("\n Calibrating mobile table \n")
-        print("Mac address" +space+"location ID\n")
-        for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
+        #Return all calibration
+        for instance in database.get_calibrating_all():
             calibrating = {
                             "mac_address":instance.mac_address,
                             "location id":instance.loc_id
                             }
             json_response["calibrating mobiles"].append(calibrating)
-            print(instance.mac_address,space, instance.loc_id)
         
-        print("\n Fingerprint value table \n")
-        print("Id" +space+"location ID" +space+"AP ID"+space+"rssi value\n")
-        for instance in session_.query(FingerprintValue).order_by(FingerprintValue.id):
+        #Return all fingerprint
+        for instance in database.get_fingerprint_all():
             fingerprint = {
                         "id":instance.id,
                         "location id":instance.loc_id,
@@ -265,7 +206,6 @@ def start_calibration():
                         "rssi":instance.rssi
                         }
             json_response["fingerprints"].append(fingerprint)
-            print(instance.id,space, instance.loc_id,space, instance.ap_id,space, instance.rssi)
         
         json_response = json.dumps(json_response, indent=4)
         
@@ -309,6 +249,65 @@ def stop_calibration():
     else:
         #If request.method is equal to 'GET', fetch and return locations, calibrating mobiles and fingerprints in the database
         json_response = {"locations":[],"calibrating mobiles":[],"fingerprints":[]}
+
+        #Return all locations
+        for instance in database.get_location_all():
+            location = {
+                        "id":instance.id,
+                        "x":instance.x,
+                        "y":instance.y,
+                        "z":instance.z
+                        }
+            json_response["locations"].append(location)
+
+        #Return all calibration
+        for instance in database.get_calibrating_all():
+            calibrating = {
+                            "mac_address":instance.mac_address,
+                            "location id":instance.loc_id
+                            }
+            json_response["calibrating mobiles"].append(calibrating)
+        
+        #Return all fingerprint
+        for instance in database.get_fingerprint_all():
+            fingerprint = {
+                        "id":instance.id,
+                        "location id":instance.loc_id,
+                        "access point id":instance.ap_id,
+                        "rssi":instance.rssi
+                        }
+            json_response["fingerprints"].append(fingerprint)
+        
+        json_response = json.dumps(json_response, indent=4)
+        
+        return json_response
+
+
+@app.route("/locate", methods=['GET', 'POST'])
+def locate():
+    """
+        ToDO: implement this function
+        It receives one parameter: mac_addr (string)
+        Must locate the device based on samples less than 1 second old, whose source address equals mac_addr
+        These samples are compared to the content of fingerprint_value table
+        Use the closest in RSSI algorithm to find a fingerprint sample matching current sample and return its location
+    """
+
+    if request.method == 'POST':
+        
+        #Fetch data
+        mac_addr = request.args.get('mac_addr')
+
+        #Check if data are given
+        if not mac_addr:
+            return "No mac address provided"
+        
+        #Convert data into the right type
+        mac_addr = str(mac_addr)
+
+    else:
+        #If request.method is equal to 'GET', fetch and return locations
+        json_response = {"locations":[]}
         print("\n Location table \n")
         print("Id" +space+"X value" +space+"Y value"+space+"Z value\n")
         for instance in session_.query(Location).order_by(Location.id):
@@ -320,43 +319,7 @@ def stop_calibration():
                         }
             json_response["locations"].append(location)
             print(instance.id,space, instance.x,space, instance.y,space, instance.z)
-
-        print("\n Calibrating mobile table \n")
-        print("Mac address" +space+"location ID\n")
-        for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
-            calibrating = {
-                            "mac_address":instance.mac_address,
-                            "location id":instance.loc_id
-                            }
-            json_response["calibrating mobiles"].append(calibrating)
-            print(instance.mac_address,space, instance.loc_id)
-        
-        print("\n Fingerprint value table \n")
-        print("Id" +space+"location ID" +space+"AP ID"+space+"rssi value\n")
-        for instance in session_.query(FingerprintValue).order_by(FingerprintValue.id):
-            fingerprint = {
-                        "id":instance.id,
-                        "location id":instance.loc_id,
-                        "access point id":instance.ap_id,
-                        "rssi":instance.rssi
-                        }
-            json_response["fingerprints"].append(fingerprint)
-            print(instance.id,space, instance.loc_id,space, instance.ap_id,space, instance.rssi)
         
         json_response = json.dumps(json_response, indent=4)
         
         return json_response
-
-
-@app.route("/locate", methods=['GET', 'POST'])
-def locate():
-    """
-        TODO: implement this function
-        It receives one parameter: mac_addr (string)
-        Must locate the device based on samples less than 1 second old, whose source address equals mac_addr
-        These samples are compared to the content of fingerprint_value table
-        Use the closest in RSSI algorithm to find a fingerprint sample matching current sample and return its location
-    """
-    # Your code here
-    return None
-
