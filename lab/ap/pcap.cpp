@@ -1,6 +1,6 @@
-#include <defines.h>
-#include <http.h>
-#include <pcap_handler.h>
+#include "defines.h"
+#include "http.h"
+#include "pcap_handler.h"
 #include <iostream>
 #include <pcap.h>
 #include <getopt.h>
@@ -60,7 +60,7 @@ void sigint_handler(int sig) {
  * \TODO: implement new options and use config singleton to store cfg values.
  * */
 int main(int argc, char *argv[]) {
-  string iface_name{""};
+  string iface_name{"wlan0mon"};
   int opt;
   opt = getopt(argc, argv, "i:");
   if (opt == 'i') {

@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <cmath>
+#include "config.h"
 
 using namespace std;
 using namespace Poco::Net;
