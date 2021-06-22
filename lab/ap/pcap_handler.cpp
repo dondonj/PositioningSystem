@@ -2,6 +2,7 @@
 #include "http.h"
 #include <radiotap_iter.h>
 #include <string>
+#include <iostream>
 
 using namespace std;
 
@@ -41,6 +42,9 @@ void process_pkts(u_char* user, const struct pcap_pkthdr *pkt, const u_char *byt
 		if(!err){
 			cout<<"test 3"<<endl;
 			auto wifi_hdr = (struct ieee80211_header *) (bytes + iter._max_length);
+			// cout<<"\n\rsource :"<<wifi_hdr<<"\n\r"<<endl;
+			int a = wifi_hdr->frame_control &0x00c0==0x0080;
+			cout<<"\n\rsource :"<< a << "\n\r"<<endl;
 			if(wifi_hdr->frame_control &0x00c0==0x0080){
 				string source= mac2string(wifi_hdr->address2);
 				cout << "\n\rsource :"<<source<<"\n\r";
