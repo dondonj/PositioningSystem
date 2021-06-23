@@ -19,9 +19,10 @@ class Location(base):
 
 class Sample(base):
     __tablename__ = "sample"
+    id = Column(Integer, primary_key=True)
     ap_id = Column(Integer, ForeignKey("accesspoint.id"))
-    source_address = Column(String, nullable=False, primary_key=True)
-    timestamp = Column(Float, nullable=False, primary_key=True)
+    source_address = Column(String, nullable=False)
+    timestamp = Column(String, nullable=False)
     rssi = Column(Float, nullable=False)
     ap = relationship("AccessPoint", backref="sample")
 
