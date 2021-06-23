@@ -34,23 +34,21 @@ void process_pkts(u_char* user, const struct pcap_pkthdr *pkt, const u_char *byt
 	int antenna;
 
 	auto rtap_hdr=(struct ieee80211_radiotap_header *) bytes;
-	cout<<"test 1"<<endl;
 	if(rtap_hdr->it_version==0){
-		cout<<"test 2"<<endl;
 		struct ieee80211_radiotap_iterator iter;
 		int  err =  ieee80211_radiotap_iterator_init (&iter, rtap_hdr  , pkt->caplen  ,  nullptr ) ;
 		if(!err){
-			cout<<"test 3"<<endl;
 			auto wifi_hdr = (struct ieee80211_header *) (bytes + iter._max_length);
 			// cout<<"\n\rsource :"<<wifi_hdr<<"\n\r"<<endl;
-			int a = wifi_hdr->frame_control &0x00c0==0x0080;
-			cout<<"\n\rsource :"<< a << "\n\r"<<endl;
-			if(wifi_hdr->frame_control &0x00c0==0x0080){
+			if((wifi_hdr->frame_control & 0x00c0)==0x0080)
+			{
 				string source= mac2string(wifi_hdr->address2);
 				cout << "\n\rsource :"<<source<<"\n\r";
-				while(ieee80211_radiotap_iterator_next(&iter)==0){
+				while(ieee80211_radiotap_iterator_next(&iter)==0)
+				{
 					switch(iter.this_arg_index){
-						case IEEE80211_RADIOTAP_DBM_ANTSIGNAL:{
+						case IEEE80211_RADIOTAP_DBM_ANTSIGNAL:
+						{
 							rssi= (int) *(iter.this_arg)-256;
 							cout<<"RSSI: "+to_string(rssi)<<endl;
 							break;
@@ -59,12 +57,14 @@ void process_pkts(u_char* user, const struct pcap_pkthdr *pkt, const u_char *byt
 						// 	char channel=(int) *(iter.this_arg)-256;
 						// 	break;
 						// }
-						case IEEE80211_RADIOTAP_ANTENNA:{
+						case IEEE80211_RADIOTAP_ANTENNA:
+						{
 							antenna=(int) *(iter.this_arg)-256;
 							cout<<"Antenna: "+to_string(antenna)<<endl;
 							break;
 						}
-						case IEEE80211_RADIOTAP_TIMESTAMP:{
+						case IEEE80211_RADIOTAP_TIMESTAMP:
+						{
 							timestamp=(int) *(iter.this_arg)-256;
 							cout<<"Timestamp: "+to_string(timestamp)<<endl;
 							break;
@@ -79,7 +79,8 @@ void process_pkts(u_char* user, const struct pcap_pkthdr *pkt, const u_char *byt
 				RSSI_sample.ts = (struct timeval) pkt->ts;
 				user2->samples.push_back(RSSI_sample);
 				gettimeofday(&timestamp_sys, NULL);
-				if(abs(timestamp_sys.tv_sec-user2->samples[0].ts.tv_sec) > 0){
+				if(abs(timestamp_sys.tv_sec-user2->samples[0].ts.tv_sec) > 0)
+				{
 					cout<<"sample sent \n\r"<<endl;
 					send_samples(user2->samples,source);
 				}
