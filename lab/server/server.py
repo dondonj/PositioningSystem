@@ -1,11 +1,13 @@
 from flask import Flask
 from flask import request, session
-import json, datetime
+
+import json
+from math import sqrt
+from datetime import datetime
 
 from server.model import AccessPoint, Location, Sample, FingerprintValue, CalibratingMobile
 from server.databaseMethods import Database
 
-from sqlalchemy.sql.expression import false
 
 SECRET_KEY = '\xfd{H\xe5<\x95\xf9\xe3\x96.5\xd1\x01O<!\xd5\xa2\xa0\x9fR"\xa1\xa8'
 
@@ -48,6 +50,7 @@ def rssi():
                 if not parameters[param]:
                     return "No rssi parameters"
 
+        print(parameters)
         #Create an access point
         ap = AccessPoint(mac_address=parameters['ap'])
 
@@ -58,28 +61,11 @@ def rssi():
             #If the ap does not exist in the database, create it
                 if not database.get_ap(ap.mac_address):
                     database.add_to_database(ap)
-                
+
                 #Create and add the sample to the database using pairs
-                sample = Sample(ap_id=database.get_ap_id(ap),source_address=key, timestamp=123,rssi=float(parameters[key]),ap=database.get_ap(ap.mac_address))
+                sample = Sample(ap_id=database.get_ap_id(ap),source_address=key, timestamp=datetime.now().strftime("%H:%M:%S"),rssi=float(parameters[key]),ap=database.get_ap(ap.mac_address))
                 database.add_to_database(sample)
 
-
-        startCalibration = session.get("startCalibration",None)
-
-        # startCalibration=False
-        #Calibration part
-        if startCalibration:
-            mac_addr = session.get("mac_addr", None)
-            if source_address == mac_addr:
-
-                #Fetch the loc.id of the mac_addr in the CalibratingMobile table
-                for loc in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
-                    if loc.mac_address == mac_addr:
-                        location = loc.loc_id
-
-                #Create a fingerprint
-                fingerprint = FingerprintValue(loc_id=location , ap_id=ap_id.id, rssi=rssi)
-                session_.add(fingerprint)
 
         #Commit and close   
         return "\n\rPOST ok\n"
@@ -94,7 +80,7 @@ def rssi():
                         "access point id":instance.ap_id,
                         "timestamp":instance.timestamp,
                         "rssi":instance.rssi
-                        }
+                    }
             json_response["samples"].append(sample)
         
         #Return all access_points
@@ -150,27 +136,24 @@ def start_calibration():
         y = float(y)
         z = float(z)
 
-        #Fill callibrating_mobile table
+        #Make and add the location instance to the database
         location = Location(x=x, y=y, z=z)
-
-        cal_mobile = CalibratingMobile(mac_address=mac_addr, loc_id=location.id)
-        session_.add(cal_mobile)
-
-        sampleList=[]
-        for instance in session_.query(Sample).order_by(Sample.source_address):
-            if instance.source_address == mac_addr and instance.timestamp >= time.time()-1:
-                
-                #Share start calibration variable
-                if startCalibration == false:
-                    startCalibration=True
-                    session["startCalibration"]=startCalibration 
-
-                #Fill list of samples
-                sampleList.add(instance)
+        if not database.exist_loc(location):
+            print("add location §§§§§§!§§§§!!!!")
+            database.add_to_database(location)
+        print("LOCATION ????")
+        #Make and add the calibrating mobile instance to the database
+        cal_mobile = CalibratingMobile(mac_address=mac_addr, loc_id=database.get_loc_id(loc=location))
+        if not database.exist_calib(cal_mobile):
+            print(database.exist_calib(cal_mobile))
+            database.add_to_database(cal_mobile)
         
-        if len(sampleList)>0:
-            for sample in sampleList:
-                fingerprint = FingerprintValue(loc_id = location.id, ap_id = sample.ap_id, rssi=sample.rssi)
+        #Get all matching samples (all samples that match the mac_addr and which are less that 1s old)
+        sampleMatchingList=database.get_matching_samples(mac_addr)
+        for sample in sampleMatchingList:
+            fingerprint = FingerprintValue(loc_id = database.get_loc_id(loc=location), ap_id = sample.ap_id, rssi=sample.rssi, location=location, ap=sample.ap)
+
+            if not database.exist_fingerprint(fingerprint):
                 database.add_to_database(fingerprint)
 
         return "\n\rPOST ok\n"
@@ -232,19 +215,11 @@ def stop_calibration():
         #Convert data into the right type
         mac_addr = str(mac_addr)
 
-        startCalibration=False
-        session["startCalibration"]=startCalibration
 
         #Delete any calibrating_mobile entry whose mac_address equal parameter mac_addr
-        for instance in session_.query(CalibratingMobile).order_by(CalibratingMobile.mac_address):
-            if instance.mac_address == mac_addr:
-                session_.delete(instance)
-        
-        #Commit and close
-        session_.commit()
-        session_.close()
-        
-        return "\n\rPOST ok\n"
+        database.del_calibrating_all(mac_addr)
+ 
+        return "\n\rPOST ok No content\n"
 
     else:
         #If request.method is equal to 'GET', fetch and return locations, calibrating mobiles and fingerprints in the database
@@ -305,12 +280,27 @@ def locate():
         #Convert data into the right type
         mac_addr = str(mac_addr)
 
+        # Get all matching samples from the database
+        matching_samples = database.get_matching_samples(mac_addr)
+        # Get all fingerprint values from the database
+        reference_points = database.get_all_fp()
+
+        d_min = 200 #Random value (not too high and not too low, reasonable)
+        location = Location() #Initialise an empty location
+        # Iterate through all the fingerprinting values to find the minimum distance 
+        for point in reference_points:
+            distance = rssi_distance(point, matching_samples) # Compute distance between the tested point and the mobile device
+            if distance < d_min:
+                d_min = distance
+                location = point.location
+
+        return location
+
     else:
         #If request.method is equal to 'GET', fetch and return locations
         json_response = {"locations":[]}
-        print("\n Location table \n")
-        print("Id" +space+"X value" +space+"Y value"+space+"Z value\n")
-        for instance in session_.query(Location).order_by(Location.id):
+
+        for instance in database.get_location_all():
             location = {
                         "id":instance.id,
                         "x":instance.x,
@@ -318,8 +308,23 @@ def locate():
                         "z":instance.z
                         }
             json_response["locations"].append(location)
-            print(instance.id,space, instance.x,space, instance.y,space, instance.z)
         
         json_response = json.dumps(json_response, indent=4)
         
         return json_response
+
+
+def rssi_distance(point, samples):
+        """
+        Compute distances between a fingerprinting value and a list of samples
+        Taken from td's lessons
+        """
+        count = 0
+        qsum = 0.0
+        for sample in samples:
+            i = sample.ap_id
+            if i != -1:
+                count += 1
+                qsum += (sample.rssi - point.rssi)**2
+        qsum += (95**2) * (1 + len(samples) - 2*count)
+        return sqrt(qsum)
