@@ -124,3 +124,26 @@ Again, test this feature with curl:
 ## Mobile device
 
 Since we have no access to the lab room, you will use curl as described above to test your code (it is even possible to really have the probe, i.e. your laptop, measure another device RSSI and communicate with the server through your local access point and network)
+
+## Useful command line
+
+Install dependencies:
+    sudo apt-get install libpoco-dev
+    sudo apt-get install aircrack-ng
+
+Aircrack usage:
+    -First of all, list out all available wireless cards connected to your PC using ‘iwconfig’ command.
+    -Kill all the processes running on wireless card using 'sudo airmon-ng check kill'.
+    -Start airmon-ng as a Monitor mode 'sudo airmon-ng start wlx00c0ca96f65a' (ID saw in the previous list).
+    -Re-type 'iwconfig' to see the new name: wlan0mon.
+    -Look at the nearby Wireless Access Points (optional): 'sudo airodump-ng wlan0mon'.
+
+Launch the server using a terminal:
+    -Go to PositioningSystem/lab
+    -Type 'export FLASK_APP=server/server'
+    -Type 'flask run --host=0.0.0.0'
+
+
+Launch the probe script:
+    -Go to the ap directory
+    -Type 'sudo ./pcap'
