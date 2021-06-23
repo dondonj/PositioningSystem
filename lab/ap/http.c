@@ -41,4 +41,5 @@ void send_samples(RSSILog samples, string ap_mac_addr) {
     HTTPClientSession HTTP_session(serv_host,serv_port);
     HTTPRequest HTTP_request(HTTPRequest::HTTP_POST,URL,HTTPMessage::HTTP_1_1);
     HTTP_session.sendRequest(HTTP_request);
+    sleep(1);
 }
