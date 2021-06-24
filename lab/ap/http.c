@@ -38,8 +38,8 @@ void send_samples(RSSILog samples, string ap_mac_addr) {
       URL += "&" + sample.mac_address + "=" + to_string(sample.rssi);
     }
     
-    HTTPClientSession HTTP_session(serv_host,serv_port);
-    HTTPRequest HTTP_request(HTTPRequest::HTTP_POST,URL,HTTPMessage::HTTP_1_1);
-    HTTP_session.sendRequest(HTTP_request);
+    HTTPClientSession HTTP_session(serv_host,serv_port); // Creates a HTTPClientSession using the given host and port.
+    HTTPRequest HTTP_request(HTTPRequest::HTTP_POST,URL,HTTPMessage::HTTP_1_1); //Creates a HTTP request with the given method, URI and version.
+    HTTP_session.sendRequest(HTTP_request); //Sends the header for the given HTTP request to the server.
     sleep(1);
 }
